@@ -9,7 +9,6 @@ metadata:
     "app.kubernetes.io/managed-by": "{{ .Release.Service }}"
     "app.kubernetes.io/instance": "{{ .Release.Name }}"
     "app.kubernetes.io/component": "{{ .Values.master.componentName }}"
-    release: "{{ .Release.Name }}"
 spec:
   podSelector:
     matchLabels:
@@ -18,7 +17,7 @@ spec:
   ingress:
     # Allow web access to the UI
     - ports:
-      - port: 8080
+      - port: {{ .Values.master.targetPort }}
     # Allow inbound connections from slave
     - from:
       - podSelector:

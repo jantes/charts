@@ -2,26 +2,9 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: "{{ .Release.Name }}-ui-test-{{ randAlphaNum 5 | lower }}"
-  labels:
-    "app.kubernetes.io/name": '{{ template "jenkins.name" .}}'
-    "helm.sh/chart": "{{ .Chart.Name }}-{{ .Chart.Version }}"
-    "app.kubernetes.io/managed-by": "{{ .Release.Service }}"
-    "app.kubernetes.io/instance": "{{ .Release.Name }}"
-    "app.kubernetes.io/component": "{{.Release.Name}}-jenkins-test"
-    release: "{{ .Release.Name }}"
   annotations:
     "helm.sh/hook": test-success
-    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: beta.kubernetes.io/arch
-            operator: In
-            values:
-            - "amd64"
   {{- if .Values.master.nodeSelector }}
   nodeSelector:
 {{ toYaml .Values.master.nodeSelector | indent 4 }}

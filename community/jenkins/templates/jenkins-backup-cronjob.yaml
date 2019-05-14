@@ -9,7 +9,6 @@ metadata:
     "app.kubernetes.io/managed-by": "{{ .Release.Service }}"
     "app.kubernetes.io/instance": "{{ .Release.Name }}"
     "app.kubernetes.io/component": "{{ .Values.backup.componentName }}"
-    release: "{{ .Release.Name }}"
 spec:
   schedule: {{ .Values.backup.schedule | quote }}
   concurrencyPolicy: Forbid
@@ -32,7 +31,7 @@ spec:
             - -n
             - {{ .Release.Namespace }}
             - -l
-            - release={{ .Release.Name }}
+            - app.kubernetes.io/instance={{ .Release.Name }}
             - --container
             - {{ template "jenkins.fullname" . }}
             - --path

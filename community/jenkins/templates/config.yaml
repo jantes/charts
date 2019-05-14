@@ -10,7 +10,6 @@ metadata:
     "app.kubernetes.io/managed-by": "{{ .Release.Service }}"
     "app.kubernetes.io/instance": "{{ .Release.Name }}"
     "app.kubernetes.io/component": "{{ .Values.master.componentName }}"
-    release: "{{ .Release.Name }}"
 data:
   config.xml: |-
     <?xml version='1.0' encoding='UTF-8'?>
@@ -45,8 +44,9 @@ data:
               <inheritFrom></inheritFrom>
               <name>{{ .Values.agent.podName }}</name>
               <instanceCap>2147483647</instanceCap>
-              <idleMinutes>0</idleMinutes>
-              <label>{{ .Release.Name }}-{{ .Values.agent.co }} {{ .Values.agent.customJenkinsLabels  | join " " }}</label>
+              <idleMinutes>{{ .Values.agent.idleMinutes }}</idleMinutes>
+              <label>{{ .Release.Name }}-{{ .Values.agent.componentName }} {{ .Values.agent.customJenkinsLabels  | join " " }}</label>
+              <serviceAccount>{{ include "jenkins.serviceAccountAgentName" . }}</serviceAccount>
               <nodeSelector>
                 {{- $local := dict "first" true }}
                 {{- range $key, $value := .Values.agent.nodeSelector }}
@@ -92,11 +92,7 @@ data:
                   <envVars>
                     <org.csanchez.jenkins.plugins.kubernetes.ContainerEnvVar>
                       <key>JENKINS_URL</key>
-{{- if .Values.master.slaveKubernetesNamespace }}
-                      <value>http://{{ template "jenkins.fullname" . }}.{{.Release.Namespace}}:{{.Values.master.servicePort}}{{ default "" .Values.master.jenkinsUriPrefix }}</value>
-{{- else }}
-                      <value>http://{{ template "jenkins.fullname" . }}:{{.Values.master.servicePort}}{{ default "" .Values.master.jenkinsUriPrefix }}</value>
-{{- end }}
+                      <value>http://{{ template "jenkins.fullname" . }}.{{.Release.Namespace}}.svc.cluster.local:{{.Values.master.servicePort}}{{ default "" .Values.master.jenkinsUriPrefix }}</value>
                     </org.csanchez.jenkins.plugins.kubernetes.ContainerEnvVar>
                   </envVars>
                 </org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
@@ -120,6 +116,9 @@ data:
               <imagePullSecrets/>
 {{- end }}
               <nodeProperties/>
+{{- if .Values.agent.yamlTemplate }}
+              <yaml>{{ tpl .Values.agent.yamlTemplate . | html | indent 4 | trim }}</yaml>
+{{- end }}
               <podRetention class="org.csanchez.jenkins.plugins.kubernetes.pod.retention.Default"/>
             </org.csanchez.jenkins.plugins.kubernetes.PodTemplate>
 {{- end -}}
@@ -324,6 +323,8 @@ data:
   {{- end }}
 {{- end }}
 {{- end }}
+{{ else }}
+{{ include "override_config_map" . }}
 {{- end -}}
 {{- if .Values.master.additionalConfig }}
 {{- toYaml .Values.master.additionalConfig | indent 2 }}

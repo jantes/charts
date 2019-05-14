@@ -34,6 +34,16 @@ If release name contains chart name it will be used as a full name.
 {{- end -}}
 
 {{/*
+Generate private key for jenkins CLI
+*/}}
+{{- define "jenkins.gen-key" -}}
+{{- if not .Values.master.adminSshKey -}}
+{{- $key := genPrivateKey "rsa" -}}
+jenkins-admin-private-key: {{ $key | b64enc | quote }}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "jenkins.serviceAccountName" -}}
@@ -45,22 +55,12 @@ Create the name of the service account to use
 {{- end -}}
 
 {{/*
-  Secret name for jenkins admin user and password
+Create the name of the service account for Jenkins agents to use
 */}}
-{{- define "jenkins.getsecret" -}}
-{{- if not .Values.master.existingSecret -}}
-{{ template "jenkins.fullname" . }}
+{{- define "jenkins.serviceAccountAgentName" -}}
+{{- if .Values.serviceAccountAgent.create -}}
+    {{ default (printf "%s-%s" (include "jenkins.fullname" .) "agent") .Values.serviceAccountAgent.name }}
 {{- else -}}
-{{- .Values.master.existingSecret -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Generate private key for jenkins CLI
-*/}}
-{{- define "jenkins.gen-key" -}}
-{{- if not .Values.master.adminSshKey -}}
-{{- $key := genPrivateKey "rsa" -}}
-jenkins-admin-private-key: {{ $key | b64enc | quote }}
+    {{ default "default" .Values.serviceAccountAgent.name }}
 {{- end -}}
 {{- end -}}

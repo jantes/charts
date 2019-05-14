@@ -18,56 +18,37 @@ This chart will do the following:
 To install the chart with the release name `my-release`:
 
 ```bash
-$ helm install --name my-release community/jenkins
+$ helm install --name my-release stable/jenkins
 ```
 
-### Create a secret
-Secure and recommended approach to provide sensitive data like passwords is to generate a secret containing the sensitive data and providing the pre-created secret name during chart deployment.
+## Upgrading an existing Release to a new major version
 
-You can provide an existing secret containing `jenkins-admin-password` and if JCasC is enabled `jenkins-admin-private-key`.
-The existing secret can be provided as a value to `master.existingSecret`.
+A major chart version change (like v0.40.0 -> v1.0.0) indicates that there is an incompatible breaking change needing manual actions.
 
-If creating a secret, it is recommended to name the secret as `release-name`-`secret-name`. For example:  MyRelease-MySecret
 
-This allows the secrets to be affiliated with the release, but not directly included with the release.
-Use below command to create a secret:
-```
-kubectl create secret generic my-release-<secret_name> \
-  --from-literal='jenkins-admin-password=XXXX' \
-  --from-literal='jenkins-admin-private-key=XXXX' \
-  --from-literal='jenkins-admin-user=XXXX' \
-  --namespace namespace_name
-```
+### 1.0.0
 
-### Image Security Policies
+Breaking changes:
 
-If the cluster has image security policies enforced, jenkins docker image should be added to it
+- values have been renamed to follow helm chart best practices for naming conventions so
+  that all variables start with a lowercase letter and words are separated with camelcase
+  https://helm.sh/docs/chart_best_practices/#naming-conventions
+- all resources are now using recommended standard labels
+  https://helm.sh/docs/chart_best_practices/#standard-labels
+
+As a result of the label changes also the selectors of the deployment have been updated.
+Those are immutable so trying an updated will cause an error like:
 
 ```
-apiVersion: securityenforcement.admission.cloud.ibm.com/v1beta1
-kind: ClusterImagePolicy
-metadata:
-name: ibmcloud-default-cluster-image-policy
-spec:
- repositories:
-   - name: docker.io/jenkins/*
-```
-For documentation on managing image policies refer [Enforcing container image security](https://www.ibm.com/support/knowledgecenter/en/SSBS6K_3.1.2/manage_images/image_security.html)
-
-## Uninstalling the Chart
-
-To uninstall/delete the `my-release` deployment:
-
-```bash
-$ helm delete my-release --purge
+Error: Deployment.apps "jenkins" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"app.kubernetes.io/component":"jenkins-master", "app.kubernetes.io/instance":"jenkins"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable
 ```
 
-The command removes the Kubernetes objects associated with the chart and deletes the release. If secret is created by chart, you must
-manually remove the secret. To remove the secret for release `my-release`:
+In order to upgrade, delete the Jenkins Deployment before upgrading:
 
-```bash
-kubectl delete secret my-release
 ```
+kubectl delete deploy jenkins
+```
+
 
 ## Configuration
 
@@ -87,14 +68,13 @@ The following tables list the configurable parameters of the Jenkins chart and t
 | `master.imagePullSecret`          | Master image pull secret             | Not set                                   |
 | `master.numExecutors`             | Set Number of executors              | 0                                         |
 | `master.useSecurity`              | Use basic security                   | `true`                                    |
-| `master.existingSecret`           | Provide an existing secret containing jenkins admin user and password | Not set  |
 | `master.securityRealm`            | Custom Security Realm                | Not set                                   |
 | `master.authorizationStrategy`    | Jenkins XML job config for AuthorizationStrategy | Not set                       |
 | `master.deploymentLabels`         | Custom Deployment labels             | Not set                                   |
 | `master.serviceLabels`            | Custom Service labels                | Not set                                   |
 | `master.podLabels`                | Custom Pod labels                    | Not set                                   |
-| `master.adminUser`                | Admin username (and password) created as a secret if useSecurity is true and existing secret is not provided | `admin` |
-| `master.adminPassword`            | Admin password (and user) created as a secret if useSecurity is true and existing secret is not provided | Random value |
+| `master.adminUser`                | Admin username (and password) created as a secret if useSecurity is true | `admin` |
+| `master.adminPassword`            | Admin password (and user) created as a secret if useSecurity is true | Random value |
 | `master.jenkinsAdminEmail`        | Email address for the administrator of the Jenkins instance | Not set            |
 | `master.resources`                | Resources allocation (Requests and Limits) | `{requests: {cpu: 50m, memory: 256Mi}, limits: {cpu: 2000m, memory: 4096Mi}}`|
 | `master.initContainerEnv`         | Environment variables for Init Container                                 | Not set |
@@ -106,6 +86,7 @@ The following tables list the configurable parameters of the Jenkins chart and t
 | `master.serviceAnnotations`       | Service annotations                  | `{}`                                      |
 | `master.serviceType`              | k8s service type                     | `LoadBalancer`                            |
 | `master.servicePort`              | k8s service port                     | `8080`                                    |
+| `master.targetPort`               | k8s target port                      | `8080`                                    |
 | `master.nodePort`                 | k8s node port                        | Not set                                   |
 | `master.healthProbes`             | Enable k8s liveness and readiness probes    | `true`                             |
 | `master.healthProbesLivenessTimeout`  | Set the timeout for the liveness probe  | `120`                              |
@@ -167,6 +148,9 @@ The following tables list the configurable parameters of the Jenkins chart and t
 | `serviceAccount.name`             | name of the ServiceAccount to be used by access-controlled resources | autogenerated |
 | `serviceAccount.create`           | Configures if a ServiceAccount with this name should be created | `true`         |
 | `serviceAccount.annotations`      | Configures annotation for the ServiceAccount | `{}`                              |
+| `serviceAccountAgent.name`        | name of the agent ServiceAccount to be used by access-controlled resources | autogenerated |
+| `serviceAccountAgent.create`      | Configures if an agent ServiceAccount with this name should be created | `false`         |
+| `serviceAccountAgent.annotations` | Configures annotation for the agent ServiceAccount | `{}`                              |
 
 
 Some third-party systems, e.g. GitHub, use HTML-formatted data in their payload sent to a Jenkins webhooks, e.g. URL of a pull-request being built. To display such data as processed HTML instead of raw text set `master.enableRawHtmlMarkupFormatter` to true. This option requires installation of OWASP Markup Formatter Plugin (antisamy-markup-formatter). The plugin is **not** installed by default, please update `master.installPlugins`.
@@ -191,6 +175,8 @@ Some third-party systems, e.g. GitHub, use HTML-formatted data in their payload 
 | `agent.TTYEnabled`         | Allocate pseudo tty to the side container       | false                  |
 | `agent.containerCap`       | Maximum number of agent                         | 10                     |
 | `agent.podName`            | slave Pod base name                             | Not set                |
+| `agent.idleMinutes`        | Allows the Pod to remain active for reuse       | 0                      |
+| `agent.yamlTemplate`       | The raw yaml of a Pod API Object to merge into the agent spec | Not set                |
 
 
 Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`.
@@ -198,7 +184,7 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 Alternatively, a YAML file that specifies the values for the parameters can be provided while installing the chart. For example,
 
 ```bash
-$ helm install --name my-release -f values.yaml community/jenkins
+$ helm install --name my-release -f values.yaml stable/jenkins
 ```
 
 > **Tip**: You can use the default [values.yaml](values.yaml)
@@ -230,7 +216,7 @@ the DefaultDeny namespace annotation. Note: this will enforce policy for _all_ p
 
 Install helm chart with network policy enabled:
 
-    $ helm install community/jenkins --set networkPolicy.enabled=true
+    $ helm install stable/jenkins --set networkPolicy.enabled=true
 
 ## Adding customized securityRealm
 
@@ -289,7 +275,6 @@ It is possible to mount several volumes using `persistence.volumes` and `persist
 | `persistence.subPath`       | SubPath for jenkins-home mount  | `nil`           |
 | `persistence.volumes`       | Additional volumes              | `nil`           |
 | `persistence.mounts`        | Additional mounts               | `nil`           |
-| `persistence.useDynamicProvisioning` | Enable dynamic provisioning of PVC | `false` |
 
 #### Existing PersistentVolumeClaim
 
@@ -298,7 +283,7 @@ It is possible to mount several volumes using `persistence.volumes` and `persist
 3. Install the chart
 
 ```bash
-$ helm install --name my-release --set persistence.existingClaim=PVC_NAME community/jenkins
+$ helm install --name my-release --set persistence.existingClaim=PVC_NAME stable/jenkins
 ```
 
 ## Configuration as Code
@@ -353,7 +338,7 @@ You can instead grant this permission via the UI. When this is done, you can set
 
 RBAC is enabled by default if you want to disable it you will need to do the following:
 
-* `helm install community/jenkins --set rbac.create=false`
+* `helm install stable/jenkins --set rbac.create=false`
 
 ## Backup
 
@@ -389,10 +374,9 @@ Fortunately the default jenkins docker image `jenkins/jenkins` contains a user `
 Simply use the following settings to run Jenkins as `jenkins` user with uid `1000`.
 
 ```yaml
-jenkins:
-  master:
-    runAsUser: 1000
-    fsGroup: 1000
+master:
+  runAsUser: 1000
+  fsGroup: 1000
 ```
 
 ## Providing jobs xml
@@ -500,7 +484,3 @@ and provide the file `templates/config.tpl` in your parent chart for your use ca
     <CONTENTS_HERE>
 {{ end }}
 ```
-
-## Support
-
-There are many ways to engage with the Jenkins project and community. Visit [Jenkins Community Page](https://jenkins.io/participate/) to get you started. Welcome aboard!

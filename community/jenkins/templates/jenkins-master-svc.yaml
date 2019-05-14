@@ -8,7 +8,6 @@ metadata:
     "app.kubernetes.io/managed-by": "{{ .Release.Service }}"
     "app.kubernetes.io/instance": "{{ .Release.Name }}"
     "app.kubernetes.io/component": "{{ .Values.master.componentName }}"
-    release: "{{ .Release.Name }}"
     {{- if .Values.master.serviceLabels }}
 {{ toYaml .Values.master.serviceLabels | indent 4 }}
     {{- end }}
@@ -20,7 +19,7 @@ spec:
   ports:
     - port: {{.Values.master.servicePort}}
       name: http
-      targetPort: 8080
+      targetPort: {{ .Values.master.targetPort }}
       {{if (and (eq .Values.master.serviceType "NodePort") (not (empty .Values.master.nodePort)))}}
       nodePort: {{.Values.master.nodePort}}
       {{end}}

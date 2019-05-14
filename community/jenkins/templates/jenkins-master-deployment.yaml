@@ -1,4 +1,8 @@
+{{- if .Capabilities.APIVersions.Has "apps/v1" }}
 apiVersion: apps/v1
+{{- else }}
+apiVersion: apps/v1beta1
+{{- end }}
 kind: Deployment
 metadata:
   name: {{ template "jenkins.fullname" . }}
@@ -8,7 +12,6 @@ metadata:
     "app.kubernetes.io/managed-by": "{{ .Release.Service }}"
     "app.kubernetes.io/instance": "{{ .Release.Name }}"
     "app.kubernetes.io/component": "{{ .Values.master.componentName }}"
-    release: "{{ .Release.Name }}"
     {{- range $key, $val := .Values.master.deploymentLabels }}
     {{ $key }}: {{ $val | quote }}
     {{- end}}
@@ -31,14 +34,10 @@ spec:
         "app.kubernetes.io/managed-by": "{{ .Release.Service }}"
         "app.kubernetes.io/instance": "{{ .Release.Name }}"
         "app.kubernetes.io/component": "{{ .Values.master.componentName }}"
-        release: "{{ .Release.Name }}"
         {{- range $key, $val := .Values.master.podLabels }}
         {{ $key }}: {{ $val | quote }}
         {{- end}}
       annotations:
-        productName: {{ template "jenkins.fullname" . }}
-        productID: {{ template "jenkins.fullname" . }}
-        productVersion: "0.37.0"
         checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
         {{- if .Values.master.podAnnotations }}
 {{ toYaml .Values.master.podAnnotations | indent 8 }}
@@ -79,39 +78,30 @@ spec:
       {{- end }}
       initContainers:
 {{- if .Values.master.customInitContainers }}
-{{ toYaml .Values.master.customInitContainers | indent 8 }}
+{{ tpl (toYaml .Values.master.customInitContainers) . | indent 8 }}
 {{- end }}
         - name: "copy-default-config"
           image: "{{ .Values.master.image }}:{{ .Values.master.imageTag }}"
           imagePullPolicy: "{{ .Values.master.imagePullPolicy }}"
-          securityContext:
-            privileged: false
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
-            runAsNonRoot: true
-            runAsUser: 1000
-            capabilities:
-              drop:
-              - ALL
           command: [ "sh", "/var/jenkins_config/apply_config.sh" ]
           env:
           {{- if .Values.master.useSecurity }}
             - name: ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jenkins.getsecret" . }}
+                  name: {{ template "jenkins.fullname" . }}
                   key: jenkins-admin-password
             - name: ADMIN_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jenkins.getsecret" . }}
+                  name: {{ template "jenkins.fullname" . }}
                   key: jenkins-admin-user
             {{- if or (.Values.master.adminSshKey) (.Values.master.sidecars.configAutoReload.enabled) }}
             {{- if .Values.master.JCasC.enabled }}
             - name: ADMIN_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jenkins.getsecret" . }}
+                  name: {{ template "jenkins.fullname" . }}
                   key: {{ "jenkins-admin-private-key" | quote }}
             {{- end }}
             {{- end }}
@@ -165,15 +155,6 @@ spec:
           lifecycle:
 {{ toYaml .Values.master.lifecycle | indent 12 }}
           {{- end }}
-          securityContext:
-            privileged: false
-            allowPrivilegeEscalation: false
-            runAsNonRoot: true
-            readOnlyRootFilesystem: false
-            runAsUser: 1000
-            capabilities:
-              drop:
-              - ALL
           env:
             - name: JAVA_OPTS
               value: {{ default "" .Values.master.javaOpts | quote }}
@@ -185,19 +166,19 @@ spec:
             - name: ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jenkins.getsecret" . }}
+                  name: {{ template "jenkins.fullname" . }}
                   key: jenkins-admin-password
             - name: ADMIN_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jenkins.getsecret" . }}
+                  name: {{ template "jenkins.fullname" . }}
                   key: jenkins-admin-user
             {{- if or (.Values.master.adminSshKey) (.Values.master.sidecars.configAutoReload.enabled) }}
             {{- if .Values.master.JCasC.enabled }}
             - name: ADMIN_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jenkins.getsecret" . }}
+                  name: {{ template "jenkins.fullname" . }}
                   key: {{ "jenkins-admin-private-key" | quote }}
             {{- end }}
             {{- end }}
@@ -307,14 +288,14 @@ spec:
             - name: ADMIN_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jenkins.getsecret" . }}
+                  name: {{ template "jenkins.fullname" . }}
                   key: jenkins-admin-user
             {{- if or (.Values.master.adminSshKey) (.Values.master.sidecars.configAutoReload.enabled) }}
             {{- if .Values.master.JCasC.enabled }}
             - name: ADMIN_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jenkins.getsecret" . }}
+                  name: {{ template "jenkins.fullname" . }}
                   key: {{ "jenkins-admin-private-key" | quote }}
             {{- end }}
             {{- end }}
